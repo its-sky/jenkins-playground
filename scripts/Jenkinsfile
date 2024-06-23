@@ -10,6 +10,7 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('DOCKERHUB')
         repository = "mincshin/test-jenkins"
         dockerImage = ''
+		response = ''
     }
     
     stages {
@@ -71,7 +72,7 @@ pipeline {
                     
                     while (retryCount < maxRetries && !isRunning) {
 						try {
-							def response = sh(script: "curl -s http://localhost:8080/health", returnStdout: true).trim()
+							response = sh(script: "curl -s http://localhost:8080/health", returnStdout: true).trim()
 						} catch (Exception ignored) {}
                         echo "Health check response: ${response}"
                         if (response.contains("UP")) {
