@@ -1,0 +1,96 @@
+pipeline {
+    agent any
+    tools {
+        gradle 'gradle'
+    }
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '3'))
+    }
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('DOCKERHUB')
+        repository = "mincshin/test-jenkins"
+        dockerImage = ''
+    }
+    
+    stages {
+        stage('저장소 복제') {
+            steps {
+                git branch: 'main', credentialsId: 'GITHUB_ACCESS_TOKEN', url: 'https://github.com/its-sky/jenkins-playground'
+            }
+        }
+        
+        stage('빌드') {
+            steps {
+                sh 'chmod +x ./gradlew'
+                sh "./gradlew clean build -x test"
+            }
+        }
+        
+        stage('Docker 빌드') {
+            steps {
+                script {
+                    sh 'cp ./build/libs/jenkins-0.0.1-SNAPSHOT.jar .'
+                    dockerImage = docker.build(repository + ":$BUILD_NUMBER")
+                }
+            }
+        }
+        
+        stage('Dockerhub 로그인') {
+            steps {
+                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+            }
+        }
+        
+        stage('Dockerhub Push') {
+            steps {
+                sh 'docker push $repository:$BUILD_NUMBER'
+            }
+        }
+        
+        stage('Docker Image Pull') {
+            steps {
+                sh 'docker pull $repository:$BUILD_NUMBER'
+            }
+        }
+        
+        stage('이전 컨테이너 중지') {
+            steps {
+                sh 'docker stop test-jenkins || true'
+                sh 'docker rm test-jenkins || true'
+            }
+        }
+        
+        stage('새로운 컨테이너 실행') {
+            steps {
+                script {
+                    sh 'docker run -d -p 8080:8080 --name test-jenkins $repository:$BUILD_NUMBER'
+                    
+                    def maxRetries = 15
+                    def retryCount = 0
+                    def isRunning = false
+                    
+                    while (retryCount < maxRetries && !isRunning) {
+                        def response = sh(script: "curl -s http://localhost:10000/health", returnStdout: true).trim()
+                        echo "Health check response: ${response}"
+                        if (response.contains("UP")) {
+                            isRunning = true
+                            break
+                        }
+                        
+                        if (!isRunning) {
+                            sleep(2)
+                        }
+                    }
+                    if (!isRunning) {
+                        error "컨테이너가 15초 이내에 정상적으로 실행되지 않았습니다."
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            sh 'docker logout'
+        }
+    }
+}
