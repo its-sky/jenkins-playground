@@ -70,7 +70,7 @@ pipeline {
                     def isRunning = false
                     
                     while (retryCount < maxRetries && !isRunning) {
-                        def response = sh(script: "curl -s http://localhost:10000/health", returnStdout: true).trim()
+                        def response = sh(script: "curl -s http://localhost:8080/health", returnStdout: true).trim()
                         echo "Health check response: ${response}"
                         if (response.contains("UP")) {
                             isRunning = true
