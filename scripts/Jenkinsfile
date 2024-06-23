@@ -70,7 +70,9 @@ pipeline {
                     def isRunning = false
                     
                     while (retryCount < maxRetries && !isRunning) {
-                        def response = sh(script: "curl -s http://localhost:8080/health", returnStdout: true).trim()
+						try {
+							def response = sh(script: "curl -s http://localhost:8080/health", returnStdout: true).trim()
+						} catch (Exception ignored) {}
                         echo "Health check response: ${response}"
                         if (response.contains("UP")) {
                             isRunning = true
@@ -88,4 +90,9 @@ pipeline {
             }
         }
     }
+	post {
+		always {
+			sh 'docker logout'
+		}
+	}
 }
