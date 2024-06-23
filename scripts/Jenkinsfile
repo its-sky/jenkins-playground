@@ -10,7 +10,6 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('DOCKERHUB')
         repository = "mincshin/test-jenkins"
         dockerImage = ''
-		response = ''
     }
     
     stages {
@@ -69,12 +68,15 @@ pipeline {
                     def maxRetries = 15
                     def retryCount = 0
                     def isRunning = false
+					def response = ""
                     
                     while (retryCount < maxRetries && !isRunning) {
 						try {
 							response = sh(script: "curl -s http://localhost:8080/health", returnStdout: true).trim()
 						} catch (Exception ignored) {}
+
                         echo "Health check response: ${response}"
+
                         if (response.contains("UP")) {
                             isRunning = true
                             break
@@ -83,6 +85,7 @@ pipeline {
                         if (!isRunning) {
                             sleep(2)
                         }
+						retryCount++
                     }
                     if (!isRunning) {
                         error "컨테이너가 15초 이내에 정상적으로 실행되지 않았습니다."
